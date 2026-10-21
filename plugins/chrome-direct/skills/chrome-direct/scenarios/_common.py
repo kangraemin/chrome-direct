@@ -180,3 +180,29 @@ def expand(value, info):
     if isinstance(value, list):
         return [expand(v, info) for v in value]
     return value
+
+
+# ---------- 텔레그램 알림(선택) ----------
+
+def notify(text, photo=None):
+    """CHROME_DIRECT_TG_TOKEN / CHROME_DIRECT_TG_CHAT_ID 가 있으면 텔레그램으로 보낸다(QR 사진 등).
+    없으면 아무것도 안 하고 False. 사람이 맥 앞에 없을 때 폰으로 QR을 받는 용도."""
+    import urllib.parse, urllib.request, uuid
+    tok, chat = os.environ.get("CHROME_DIRECT_TG_TOKEN"), os.environ.get("CHROME_DIRECT_TG_CHAT_ID")
+    if not (tok and chat):
+        return False
+    base = f"https://api.telegram.org/bot{tok}/"
+    try:
+        if photo is None:
+            urllib.request.urlopen(base + "sendMessage", urllib.parse.urlencode({"chat_id": chat, "text": text}).encode(), timeout=20)
+            return True
+        b = uuid.uuid4().hex
+        body = (f"--{b}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{chat}\r\n"
+                f"--{b}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{text}\r\n"
+                f"--{b}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"qr.png\"\r\nContent-Type: image/png\r\n\r\n").encode() \
+            + photo + f"\r\n--{b}--\r\n".encode()
+        urllib.request.urlopen(urllib.request.Request(base + "sendPhoto", body, {"Content-Type": f"multipart/form-data; boundary={b}"}), timeout=20)
+        return True
+    except Exception as e:
+        print(f"TG_FAIL {type(e).__name__}", file=sys.stderr)
+        return False

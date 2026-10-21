@@ -42,6 +42,9 @@ Claude Code 플러그인으로 설치합니다.
 - `CHROME_DIRECT_PROFILE`은 기본 Chrome 프로필 폴더입니다(기본 `Default`, `chrome://version`의 프로필 경로 끝에서 확인).
 - `CHROME_DIRECT_GOOGLE_ACCOUNT`는 Gmail 시나리오가 쓸 Google 계정입니다.
 - `CHROME_DIRECT_INFO`는 폼 자동 입력용 개인정보 JSON 경로입니다(기본 `~/.chrome-direct/info.json`, 예: `{"name": "...", "email": "..."}`).
+  - 본인확인(`pass_sms_verify.py`)을 쓰려면 `birth`(1990-01-31), `phone`, `gender_digit`(주민번호 뒷자리 첫 숫자), `carrier`(skt/kt/lgu), `mvno`(알뜰폰이면 true)도 넣습니다.
+  - 이 파일은 내 컴퓨터에만 둡니다. 레포에는 개인정보가 없습니다.
+- `CHROME_DIRECT_TG_TOKEN` / `CHROME_DIRECT_TG_CHAT_ID`를 주면 로그인 QR을 텔레그램으로 받습니다(선택). 맥 앞에 없을 때 폰으로 스캔하는 용도입니다.
 - `CHROME_DIRECT_HOME_DIR`은 설정·잠금·사용자 시나리오 폴더입니다(기본 `~/.chrome-direct`).
 - 비밀값은 환경변수나 `~/.chrome-direct/.env`에서만 읽고 출력하지 않습니다.
 
@@ -57,6 +60,9 @@ Claude Code 플러그인으로 설치합니다.
 | `gform_fill.py <url> answers.json` | 구글폼 채우기(기본 dry-run, `--submit --lock-id 이름`일 때만 제출) |
 | `page_check.py <url> --kw 결과 --kw 발표` | 아무 페이지에서 키워드가 든 줄과 링크 뽑기 |
 | `notion_export.py <page_id> <out_dir>` | 노션 페이지 트리를 마크다운으로 내보내기 |
+| `naver_login.py [--qr --notify] [--otp N]` | 네이버 로그인 확인. 로그아웃이면 QR 로그인(앱으로 스캔만) |
+| `kakao_share_cache.py <url> [--check]` | 카카오톡 공유 미리보기 캐시 초기화. 로그아웃이면 QR 로그인 |
+| `pass_sms_verify.py send` → `send --captcha N` → `code 123456` | 휴대폰 본인확인(PASS) 문자 인증. 사람은 문자로 온 6자리만 |
 
 사용 예:
 

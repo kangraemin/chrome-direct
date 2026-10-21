@@ -24,7 +24,8 @@ python3 ${CLAUDE_SKILL_DIR}/scenarios/<scenario>.py ... [--profile "Default"] [-
 ## 설정(환경변수, 모두 선택)
 - `CHROME_DIRECT_PROFILE`: 기본 Chrome 프로필 폴더 이름(기본 `Default`, `chrome://version`의 프로필 경로 끝에서 확인).
 - `CHROME_DIRECT_GOOGLE_ACCOUNT`: Gmail 시나리오와 `google_relogin`이 쓸 Google 계정.
-- `CHROME_DIRECT_INFO`: 폼 자동 입력에 쓸 개인정보 JSON 경로(기본 `~/.chrome-direct/info.json`).
+- `CHROME_DIRECT_INFO`: 폼 자동 입력에 쓸 개인정보 JSON 경로(기본 `~/.chrome-direct/info.json`). 본인확인용 키: `name` `birth` `phone` `gender_digit` `carrier` `mvno`. 값은 출력하지 않는다.
+- `CHROME_DIRECT_TG_TOKEN` / `CHROME_DIRECT_TG_CHAT_ID`: 있으면 로그인 QR을 텔레그램으로 보낸다(선택).
 - `CHROME_DIRECT_CODEX_SCRIPT`: Codex 폴백 래퍼 스크립트 경로(선택, 아래 참고).
 
 ## 시나리오
@@ -38,6 +39,9 @@ python3 ${CLAUDE_SKILL_DIR}/scenarios/<scenario>.py ... [--profile "Default"] [-
 | `gform_fill.py <url> answers.json [--submit --lock-id 이름]` | 구글폼 채우기, `--submit`이 있을 때만 제출 | 제출 |
 | `page_check.py <url> --kw a --kw b [--name]` | 아무 페이지에서 키워드가 든 줄과 링크 뽑기 | 읽기 |
 | `notion_export.py <page_id> <out_dir>` | 노션 페이지 트리를 로컬 마크다운으로 내보내기(로그인된 탭의 내부 API 사용) | 읽기 |
+| `naver_login.py [--qr --notify] [--otp N]` | 네이버 로그인 확인(exit 0 IN, 2 LOGGED_OUT). `--qr --notify`면 QR+고를 숫자를 텔레그램으로 보내고 스캔될 때까지 대기(3분×3회). 비밀번호 안 씀. 백그라운드로 돌리고 `RESULT: OK`가 나오면 다음 단계로 | 로그인 |
+| `kakao_share_cache.py <url> [--check]` | 카카오톡 공유 미리보기(OG) 캐시 초기화 + 새 메타 조회(카카오 디벨로퍼스 공유 디버거). 로그아웃이면 QR을 잘라 저장·전송, 270초마다 새 QR | 제출 |
+| `pass_sms_verify.py send [--captcha N] [--match mobile-ok] \| code 123456 \| extend` | 휴대폰 본인확인(PASS/mobile-ok) 문자 인증. 사이트에서 인증 창을 먼저 연다. 보안문자 그림을 저장하고 멈춤 → 읽어서 `send --captcha`(틀려도 반복 금지). 사람은 문자 6자리만. 확인 버튼은 DOM click만 먹는다 | 제출 |
 | `_template.py` | 새 시나리오 템플릿 | - |
 
 ## 제출형 규칙
