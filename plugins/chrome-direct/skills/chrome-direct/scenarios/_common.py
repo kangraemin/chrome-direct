@@ -1,0 +1,182 @@
+"""Shared bits for chrome-direct scenarios: new-tab lifecycle, polling, Codex fallback,
+submit guard/lock, optional personal info file. Scenarios print one JSON object on stdout and a
+last line `RESULT: <STATUS> ...`. Exit 0 = ok, 1 = failed (after fallback if enabled),
+2 = blocked (login needed / already submitted / lock held) — never fall back on 2."""
+import argparse, contextlib, json, os, re, subprocess, sys, tempfile, time
+from datetime import datetime
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+import chromectl as c  # noqa: E402
+
+HOME_DIR = Path(os.environ.get("CHROME_DIRECT_HOME_DIR", Path.home() / ".chrome-direct")).expanduser()
+LOCKS = HOME_DIR / "locks"                      # 제출 중복 방지 잠금 폴더
+INFO_FILE = Path(os.environ.get("CHROME_DIRECT_INFO", HOME_DIR / "info.json")).expanduser()  # 개인정보 JSON(선택)
+ACCOUNT = os.environ.get("CHROME_DIRECT_GOOGLE_ACCOUNT", "")  # 기본 Google 계정(선택)
+DEFAULT_PROFILE = os.environ.get("CHROME_DIRECT_PROFILE", "Default")
+
+
+class Blocked(Exception):
+    """Stop without Codex fallback (login needed, already submitted, lock held...)."""
+
+
+def parser(desc, submit=False):
+    ap = argparse.ArgumentParser(description=desc)
+    ap.add_argument("--profile", default=DEFAULT_PROFILE, help="Chrome profile dir (기본: $CHROME_DIRECT_PROFILE 또는 Default)")
+    ap.add_argument("--no-fallback", action="store_true", help="실패해도 Codex로 넘기지 않음 (Codex 설정이 없으면 원래 안 넘김)")
+    ap.add_argument("--codex-out", help="Codex 결과 파일 (기본: 임시 경로)")
+    ap.add_argument("--keep-tab", action="store_true", help="끝나도 연 탭을 닫지 않음")
+    if submit:
+        ap.add_argument("--submit", action="store_true", help="마지막 제출/전송 버튼까지 누름 (없으면 dry-run)")
+        ap.add_argument("--lock-id", help="제출 중복 방지용 이름 — 주면 ~/.chrome-direct/locks/<id>.submit.lock 으로 한 번만 제출")
+    return ap
+
+
+# 편집기가 먼저 단 beforeunload 리스너는 stopImmediatePropagation으로 못 막는다(같은 대상에선 등록 순서대로 돈다)
+# → preventDefault·returnValue 자체를 무력화해 확인창이 아예 안 뜨게 한다
+NO_UNLOAD = ("window.onbeforeunload=null;window.addEventListener('beforeunload',e=>{e.stopImmediatePropagation()},true);"
+             "const P=BeforeUnloadEvent.prototype;P.preventDefault=function(){};"
+             "Object.defineProperty(P,'returnValue',{configurable:true,get(){return ''},set(){}});1")
+
+
+@contextlib.contextmanager
+def tab(url, args):
+    """Open url in a NEW tab of args.profile; close it afterwards (unless --keep-tab)."""
+    tid = c.new_tab(url, args.profile)
+    try:
+        with contextlib.suppress(Exception):
+            time.sleep(1.5); c.run_js(tid, NO_UNLOAD, timeout=8)
+        yield tid
+    finally:
+        with contextlib.suppress(Exception):  # '사이트에서 나가시겠습니까?' 확인창이 뜨지 않게 먼저 끈다
+            c.run_js(tid, NO_UNLOAD, timeout=8)
+        if not getattr(args, "keep_tab", False):
+            with contextlib.suppress(Exception):
+                c.close_tab(tid)
+
+
+def js(tid, body, timeout=20):
+    return c.js_json(tid, body, timeout)
+
+
+def poll(tid, body, timeout=25, every=1.0):
+    """Re-run JS `body` until it returns a truthy value; return it (or raise)."""
+    end, last = time.time() + timeout, None
+    while time.time() < end:
+        try:
+            last = js(tid, body)
+            if last:
+                return last
+        except Exception as e:  # page mid-navigation
+            last = str(e)
+        time.sleep(every)
+    raise RuntimeError(f"timeout waiting: {str(last)[:200]}")
+
+
+def emit(obj, status, note=""):
+    print(json.dumps(obj, ensure_ascii=False, indent=1))
+    print(f"RESULT: {status} {note}".rstrip())
+
+
+CODEX_HEAD = """IMPORTANT: Ignore repo AGENTS.md workflow rules; do not ask questions.
+
+BROWSER SETUP (do this first): Use the Chrome plugin (openai-bundled "chrome"), NOT any Claude skill under ~/.agents. Run tool discovery (tool_search) for "node_repl js" with limit 10 to expose `mcp__node_repl__js`. Then in that js tool:
+const {{ setupBrowserRuntime }} = await import("{mjs}");
+const agent = await setupBrowserRuntime();
+const chrome = await agent.browsers.get("chrome");
+nodeRepl.write(await chrome.documentation());
+Read the full documentation, then use `const tab = await chrome.tabs.new()`.
+
+CONNECTION RECOVERY: On any connection/CDP timeout, read `await agent.documentation.get("chrome-troubleshooting")`, open a brand-new tab, wait ~15s and retry, up to 5 times. Close only tabs you opened.
+
+RULES: Use the owner's real Mac Chrome (profile "{profile}"). Never create browser profiles, copy cookies, or use Playwright with a new profile. Never type or guess passwords. Do not try to sign in to Google — if a Google/site login is required, print `STATUS: LOGIN_REQUIRED <what it asks>` and stop. Do not accept terms, pay, release, or send anything not stated in the task. 
+"""
+
+
+def _chrome_mjs():
+    base = Path.home() / ".codex/plugins/cache/openai-bundled/chrome"
+    for d in [base / "latest"] + sorted(base.glob("*"), reverse=True):
+        f = d / "scripts/browser-client.mjs"
+        if f.exists():
+            return str(f)
+    return str(base / "latest/scripts/browser-client.mjs")
+
+
+def fallback(args, task, why, cwd=None):
+    """Hand the same goal to Codex (real Chrome) unless --no-fallback. Exits the process."""
+    print(f"SCRIPT_FAIL: {why}", file=sys.stderr)
+    if getattr(args, "no_fallback", False) or not c.codex_available():
+        print(f"RESULT: FAIL {why}")
+        sys.exit(1)
+    out = args.codex_out or tempfile.mktemp(prefix="chromedirect-codex-", suffix=".out")
+    prompt = CODEX_HEAD.format(mjs=_chrome_mjs(), profile=args.profile) + \
+        f"\nTASK:\n{task}\n\n(LLM 없는 스크립트가 먼저 시도했다가 실패함: {why}. 현재 화면 상태부터 확인하고 이어서 해라.)\n" \
+        "Last line: `STATUS: DONE | LOGIN_REQUIRED | NEEDS_OWNER | FAILED <reason>`\n"
+    fd, pf = tempfile.mkstemp(prefix="chromedirect-prompt-", suffix=".txt")
+    with os.fdopen(fd, "w") as f:
+        f.write(prompt)
+    print(f"FALLBACK codex → {out}")
+    rc = subprocess.run(["bash", str(c.CODEX), pf, out, str(cwd or Path.cwd())]).returncode
+    with contextlib.suppress(Exception):
+        print(Path(out).read_text()[-3000:])
+    print(f"RESULT: {'CODEX_DONE' if rc == 0 else 'CODEX_FAIL'} {why}")
+    sys.exit(0 if rc == 0 else 1)
+
+
+def run(main, args, task, cwd=None):
+    """Call main(); Blocked → exit 2, other errors → Codex fallback with `task`."""
+    try:
+        main()
+    except Blocked as e:
+        print(f"RESULT: BLOCKED {e}")
+        sys.exit(2)
+    except SystemExit:
+        raise
+    except Exception as e:
+        if os.environ.get("CHROMEDIRECT_DEBUG"):
+            import traceback
+            traceback.print_exc()
+        fallback(args, task, f"{type(e).__name__}: {e}", cwd)
+
+
+# ---------- 제출 중복 방지 ----------
+
+def guard_and_lock(lock_id):
+    """Before the final click. Raises Blocked if the same lock-id was already used."""
+    if not lock_id:
+        return None
+    LOCKS.mkdir(parents=True, exist_ok=True)
+    lock = LOCKS / f"{lock_id}.submit.lock"
+    try:
+        os.mkdir(lock)
+    except FileExistsError:
+        raise Blocked(f"LOCKED {lock} 이미 있음 — 이미 냈거나 다른 세션이 내는 중. 정말 다시 내려면 폴더를 지울 것")
+    (lock / "owner.txt").write_text(f"chrome-direct {Path(sys.argv[0]).name} pid={os.getpid()} {datetime.now():%Y-%m-%d %H:%M:%S}\n")
+    return lock
+
+
+def mark_not_sent(lock, why):
+    if lock:
+        with contextlib.suppress(Exception):
+            (lock / "NOT_SENT.txt").write_text(f"{datetime.now():%Y-%m-%d %H:%M:%S} {why}\n")
+
+
+# ---------- 개인정보(선택) ----------
+
+def personal_info():
+    """~/.chrome-direct/info.json({"name": "...", "phone": "...", ...})을 읽는다. 없으면 빈 dict.
+    answers.json 값 안의 {name} {phone} 같은 자리표시자를 채우는 데만 쓰고, 출력하지 않는다."""
+    try:
+        return json.loads(INFO_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def expand(value, info):
+    """Replace {name} {phone} ... placeholders. Unknown braces are left as-is."""
+    if isinstance(value, str):
+        return re.sub(r"\{(\w+)\}", lambda m: info.get(m.group(1), m.group(0)), value)
+    if isinstance(value, list):
+        return [expand(v, info) for v in value]
+    return value

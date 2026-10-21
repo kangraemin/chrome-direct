@@ -1,0 +1,12 @@
+{
+  "name": "chrome-direct",
+  "description": "LLM 없이 실제 Mac Chrome을 조작하는 스크립트 도구와, 웹 조작을 스크립트로 저장하는 스킬",
+  "owner": { "name": "kangraemin" },
+  "plugins": [
+    {
+      "name": "chrome-direct",
+      "source": "./plugins/chrome-direct",
+      "description": "Drive your real Mac Chrome with AppleScript + JS scenario scripts (no LLM), and save new web actions as reusable scripts (web-scriptify)."
+    }
+  ]
+}
