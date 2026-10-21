@@ -9,6 +9,15 @@ English: AppleScript + JS scenario scripts that drive your real, already-signed-
 - 한 번 만든 시나리오는 LLM 호출 없이 한 줄로 돌아서 빠르고 같은 결과를 냅니다.
 - 로그인 세션을 그대로 쓰므로 별도 브라우저·프로필·쿠키 복사가 필요 없습니다.
 - 끝나면 자기가 연 탭만 닫습니다.
+- JS로 못 닿는 곳은 진짜 마우스·키보드로 누릅니다(Codex 없이 화면 조작).
+  - `rclick`: 요소의 화면 좌표를 계산해 `cliclick`으로 실제 클릭합니다. 다른 출처 iframe, 파일 선택창 버튼 등에 씁니다.
+  - `rtype`: 포커스된 칸에 실제 키 입력을 보냅니다. JS로 값을 넣으면 거부하는 입력칸에 씁니다.
+  - macOS 패스키 시트처럼 웹페이지 밖에 뜨는 창은 System Events로 창 위치를 구해 좌표로 누릅니다(`google_relogin`).
+
+```
+python3 chromectl.py rclick --match example.com --text "파일 선택"
+python3 chromectl.py rtype --value "hello" --enter
+```
 
 ## 요구사항
 - macOS와 Google Chrome.
