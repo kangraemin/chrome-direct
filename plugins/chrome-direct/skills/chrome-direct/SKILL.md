@@ -16,9 +16,11 @@ python3 ${CLAUDE_SKILL_DIR}/scenarios/<scenario>.py ... [--profile "Default"] [-
 - 2는 사용자에게 이유를 그대로 전한다.
 
 ## 사전 조건
-- macOS와 Google Chrome.
-- Chrome 메뉴 "보기 > 개발자 정보 > Apple Events의 JavaScript 허용"을 켠다.
-- `shot`/`--proof`는 터미널에 화면 기록 권한, `rclick`은 `cliclick`(`brew install cliclick`)과 손쉬운 사용 권한이 필요하다.
+- macOS, Google Chrome, Python 3.9 이상.
+- 처음 쓰기 전, 또는 어떤 스크립트든 종료코드 2와 권한·"Apple Events" 안내가 나오면 먼저 `python3 ${CLAUDE_SKILL_DIR}/chromectl.py setup`을 돌린다.
+  - 필수 설정(cliclick, 자동화·손쉬운 사용 권한, Chrome 'Apple Events의 자바스크립트 허용')을 점검하고 켤 수 있는 건 바로 켠다. `READY`면 끝.
+  - `TODO` 줄은 사람 몫이다(권한 창 '허용', 열어 둔 설정 화면에서 켜기, 펼쳐 둔 Chrome 메뉴 항목 한 번 누르기). 그 줄만 사용자에게 그대로 전하고, 끝나면 setup을 다시 돌린다.
+  - Chrome은 'Apple Events의 자바스크립트 허용'만은 System Events·cliclick 클릭을 무시했다(2026-10-22 실측). 그래서 이 항목은 사람이 한 번 누른다. 설정은 프로필마다 따로다.
 - 조작할 사이트에는 해당 Chrome 프로필로 미리 로그인해 둔다.
 
 ## 설정(환경변수, 모두 선택)

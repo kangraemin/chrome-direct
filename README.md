@@ -20,23 +20,33 @@ python3 chromectl.py rtype --value "hello" --enter
 ```
 
 ## 요구사항
-- macOS와 Google Chrome.
-- Python 3.9 이상.
-- Chrome 메뉴 `보기 > 개발자 정보 > Apple Events의 JavaScript 허용`을 켭니다.
-- 스크린샷(`shot`, `--proof`)을 쓰려면 터미널에 화면 기록 권한을 줍니다.
-- 실제 마우스 클릭(`rclick`)을 쓰려면 `brew install cliclick`과 손쉬운 사용 권한이 필요합니다.
+- macOS, Google Chrome, Python 3.9 이상(맥 기본 `python3`로 됩니다).
 - Codex는 필요 없습니다.
 
 ## 설치
-Claude Code 플러그인으로 설치합니다.
+1. Claude Code에서 플러그인을 설치합니다.
 
 ```
 /plugin marketplace add kangraemin/chrome-direct
 /plugin install chrome-direct@chrome-direct
 ```
 
-- 스킬 두 개가 들어옵니다: `chrome-direct`, `web-scriptify`.
-- 플러그인 없이 쓰려면 레포를 clone하고 `plugins/chrome-direct/skills/chrome-direct/scenarios/`의 스크립트를 직접 실행합니다.
+2. 필수 설정을 한 번에 켭니다. Claude에게 "chrome-direct setup 돌려줘"라고 하거나 직접 실행합니다.
+
+```
+python3 plugins/chrome-direct/skills/chrome-direct/chromectl.py setup
+```
+
+- 필수 설정만 차례로 점검하고, 켤 수 있는 건 바로 켭니다. 마지막 줄이 `READY`면 끝입니다.
+  - `cliclick`이 없으면 Homebrew로 설치합니다.
+  - macOS 권한 창(터미널 앱이 Chrome·System Events 제어)이 뜨면 '허용'을 누릅니다. 놔두면 거부로 굳습니다.
+  - 권한이 꺼져 있으면 해당 시스템 설정 화면(자동화·손쉬운 사용)을 열어 두고 무엇을 켤지 한 줄로 알려 줍니다.
+  - Chrome 메뉴 `보기 > 개발자 정보 > Apple Events의 자바스크립트 허용`을 켭니다. Chrome이 이 항목만은 자동 클릭을 무시해서(실측), 메뉴를 펼쳐 두고 그 항목 한 번만 누르라고 알려 줍니다.
+- 사람 손이 남으면 종료코드 2로 끝납니다. 알려 준 것을 누르고 다시 실행합니다.
+- 메뉴 이름은 Chrome 언어마다 다릅니다(영어판 `View > Developer > Allow JavaScript from Apple Events`, 미검증). 스크립트는 이름에 `Apple Events`가 든 항목을 찾습니다.
+- 이 설정은 Chrome 프로필마다 따로입니다. 다른 프로필 창에서 막히면 그 창에서 setup을 다시 돌립니다.
+- 선택: 스크린샷(`shot`, `--proof`)을 쓰려면 터미널에 화면 기록 권한을 줍니다.
+- 플러그인 없이 쓰려면 레포를 clone하고 같은 경로의 스크립트를 직접 실행합니다. 스킬 두 개(`chrome-direct`, `web-scriptify`)가 들어 있습니다.
 
 ## 설정(모두 선택)
 - `CHROME_DIRECT_PROFILE`은 기본 Chrome 프로필 폴더입니다(기본 `Default`, `chrome://version`의 프로필 경로 끝에서 확인).
