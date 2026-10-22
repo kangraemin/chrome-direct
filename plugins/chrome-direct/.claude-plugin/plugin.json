@@ -1,7 +1,7 @@
 {
   "name": "chrome-direct",
   "description": "Drive your real Mac Chrome with AppleScript + JS scenario scripts (no LLM), and save new web actions as reusable scripts (web-scriptify).",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": { "name": "kangraemin" },
   "license": "MIT",
   "keywords": ["chrome", "automation", "applescript", "macos", "scenarios"]
