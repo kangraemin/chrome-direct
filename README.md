@@ -41,7 +41,8 @@ python3 plugins/chrome-direct/skills/chrome-direct/chromectl.py setup
   - `cliclick`이 없으면 Homebrew로 설치합니다.
   - macOS 권한 창(터미널 앱이 Chrome·System Events 제어)이 뜨면 '허용'을 누릅니다. 놔두면 거부로 굳습니다.
   - 권한이 꺼져 있으면 해당 시스템 설정 화면(자동화·손쉬운 사용)을 열어 두고 무엇을 켤지 한 줄로 알려 줍니다.
-  - Chrome 메뉴 `보기 > 개발자 정보 > Apple Events의 자바스크립트 허용`을 켭니다. Chrome이 이 항목만은 자동 클릭을 무시해서(실측), 메뉴를 펼쳐 두고 그 항목 한 번만 누르라고 알려 줍니다.
+  - Chrome 메뉴 `보기 > 개발자 정보 > Apple Events의 자바스크립트 허용`을 켭니다. 진짜 마우스를 그 항목 위에 올린 뒤 클릭해서 자동으로 켭니다(접근성 API로 누르는 방식은 Chrome이 무시합니다). 이미 켜져 있으면 누르지 않습니다.
+  - 자동 클릭이 안 먹으면 메뉴를 그 항목까지 펼쳐 두고 "반드시 지금 누르라"고 알려 줍니다. Claude가 돌릴 때는 기다리지 않고 `TODO js`로 끝나며, Claude가 먼저 안내한 뒤 `setup --wait-js`로 다시 펼칩니다.
 - 사람 손이 남으면 종료코드 2로 끝납니다. 알려 준 것을 누르고 다시 실행합니다.
 - 메뉴 이름은 Chrome 언어마다 다릅니다(영어판 `View > Developer > Allow JavaScript from Apple Events`, 미검증). 스크립트는 이름에 `Apple Events`가 든 항목을 찾습니다.
 - 이 설정은 Chrome 프로필마다 따로입니다. 다른 프로필 창에서 막히면 그 창에서 setup을 다시 돌립니다.

@@ -19,8 +19,10 @@ python3 ${CLAUDE_SKILL_DIR}/scenarios/<scenario>.py ... [--profile "Default"] [-
 - macOS, Google Chrome, Python 3.9 이상.
 - 처음 쓰기 전, 또는 어떤 스크립트든 종료코드 2와 권한·"Apple Events" 안내가 나오면 먼저 `python3 ${CLAUDE_SKILL_DIR}/chromectl.py setup`을 돌린다.
   - 필수 설정(cliclick, 자동화·손쉬운 사용 권한, Chrome 'Apple Events의 자바스크립트 허용')을 점검하고 켤 수 있는 건 바로 켠다. `READY`면 끝.
-  - `TODO` 줄은 사람 몫이다(권한 창 '허용', 열어 둔 설정 화면에서 켜기, 펼쳐 둔 Chrome 메뉴 항목 한 번 누르기). 그 줄만 사용자에게 그대로 전하고, 끝나면 setup을 다시 돌린다.
-  - Chrome은 'Apple Events의 자바스크립트 허용'만은 System Events·cliclick 클릭을 무시했다(2026-10-22 실측). 그래서 이 항목은 사람이 한 번 누른다. 설정은 프로필마다 따로다.
+  - `TODO` 줄은 사람 몫이다(권한 창 '허용', 열어 둔 설정 화면에서 켜기). 사람이 할 일은 기다리는 명령을 돌리기 **전에** 먼저 사용자에게 말한다 — 너는 명령이 끝나야 출력을 보므로 기다리는 중에는 전할 수 없다.
+  - 'Apple Events의 자바스크립트 허용'은 setup이 진짜 마우스로 그 항목 위에 올린 뒤 눌러 자동으로 켠다(System Events click은 Chrome이 무시). 설정은 프로필마다 따로다.
+  - `TODO js`로 끝나면(자동 클릭 실패): 먼저 사용자에게 "곧 Chrome '보기 > 개발자 정보' 메뉴가 펼쳐집니다. 선택된 'Apple Events의 자바스크립트 허용'을 반드시 눌러 주세요"라고 말한 뒤 `chromectl.py setup --wait-js`를 백그라운드로 돌린다(메뉴를 펼치고 최대 120초 기다림). 끝나면 결과를 보고한다.
+  - 메뉴가 펼쳐진 동안 Chrome은 Apple Events에 답하지 않는다(다른 명령이 시간 초과).
 - 조작할 사이트에는 해당 Chrome 프로필로 미리 로그인해 둔다.
 
 ## 설정(환경변수, 모두 선택)
