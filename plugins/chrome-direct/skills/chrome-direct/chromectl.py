@@ -19,9 +19,10 @@ Usage:
   chromectl.py close --match id:<tab id>
   chromectl.py press --match M (--sel CSS | --text T) # pointer/mouse event sequence click
   chromectl.py shot --match M <out.png|out.pdf>       # screenshot of that tab's window
+  chromectl.py rtype (--value V | --env VAR) [--enter] # real keystrokes into the focused field
   chromectl.py run steps.json [--codex-fallback "<prompt>" --out FILE]
 Exit 0 = ok, 1 = step failed (caller may fall back to Codex), 2 = macOS permission needed (a person allows it once).
-Secrets (--env) never hit argv or stdout: the JS goes through a 0600 temp file.
+Secrets (--env) never hit argv or stdout: JS goes through a 0600 temp file, rtype text through cliclick's stdin.
 """
 import argparse, contextlib, json, os, subprocess, sys, tempfile, time
 from pathlib import Path
@@ -484,12 +485,40 @@ def google_relogin(match, email=None, tries=3):
     return "accounts.google.com" not in url()
 
 
+# 입력 소스를 argv[0](없으면 ASCII 자판, 보통 ABC)로 바꾸고 바꾸기 전 id를 돌려준다
+INPUT_SRC = r"""ObjC.import("Carbon");
+function idOf(s) { return ObjC.castRefToObject($.TISGetInputSourceProperty(s, $.kTISPropertyInputSourceID)).js; }
+function run(argv) {
+  var cur = idOf($.TISCopyCurrentKeyboardInputSource());
+  var want = argv[0] || idOf($.TISCopyCurrentASCIICapableKeyboardLayoutInputSource());
+  if (want === cur) return cur;
+  var l = ObjC.castRefToObject($.TISCreateInputSourceList(null, false));
+  for (var i = 0; i < l.count; i++) if (idOf(l.objectAtIndex(i)) === want) { $.TISSelectInputSource(l.objectAtIndex(i)); delay(0.2); break; }
+  return cur;
+}"""
+
+
+def input_source(want=""):
+    """Select an input source (default: the ASCII layout) and return the previous id, or None."""
+    r = subprocess.run(["osascript", "-l", "JavaScript", "-e", INPUT_SRC] + ([want] if want else []),
+                       capture_output=True, text=True, timeout=10)
+    return r.stdout.strip() or None if r.returncode == 0 else None
+
+
 def rtype(env=None, value=None, enter=False):
-    """Type into whatever has focus with real keystrokes (fields that reject JS values)."""
+    """Type into whatever has focus with real keystrokes (fields that reject JS values).
+    The text goes to cliclick on stdin (-f -), so a secret never shows up in `ps` argv."""
     v = secret(env) if env else value
-    subprocess.run(["cliclick", "-w", "40", f"t:{v}"], check=True, capture_output=True)
-    if enter:
-        subprocess.run(["cliclick", "kp:return"], check=True, capture_output=True)
+    if v is None or "\n" in v:
+        raise RuntimeError("rtype: --value 또는 --env 가 필요하고, 줄바꿈은 넣을 수 없음")
+    cmds = f"t:{v}\n" + ("kp:return\n" if enter else "")
+    # 한글 입력기가 켜져 있으면 cliclick이 "hello"를 "ㅗ디ㅣㅐ"로 친다(2026-10-22 실측) → 잠깐 ASCII 자판으로
+    prev = input_source() if v.isascii() else None
+    try:
+        subprocess.run(["cliclick", "-w", "40", "-f", "-"], input=cmds, text=True, check=True, capture_output=True)
+    finally:
+        if prev:
+            input_source(prev)
 
 
 def wait(match, text=None, sel=None, timeout=20):
@@ -567,6 +596,7 @@ def main():
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--match", default="")
     ap.add_argument("--sel"); ap.add_argument("--text"); ap.add_argument("--value"); ap.add_argument("--env")
+    ap.add_argument("--enter", action="store_true", help="rtype 뒤 Enter")
     ap.add_argument("--timeout", type=int, default=20); ap.add_argument("--profile")
     ap.add_argument("--codex-fallback"); ap.add_argument("--out")
     a = ap.parse_args()
@@ -595,7 +625,7 @@ def main():
         elif a.cmd == "close":
             close_tab(a.match)
         elif a.cmd == "rtype":
-            rtype(a.env, a.value, enter=True)
+            rtype(a.env, a.value, enter=a.enter)
         elif a.cmd == "wait":
             wait(a.match, a.text, a.sel, a.timeout)
         elif a.cmd == "text":
