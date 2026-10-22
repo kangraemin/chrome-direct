@@ -398,18 +398,19 @@ var __press = e => { e.scrollIntoView({block: 'center'}); const b = e.getBoundin
   const o = {bubbles: true, cancelable: true, view: window, clientX: b.left + b.width / 2, clientY: b.top + b.height / 2, button: 0};
   for (const k of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
     e.dispatchEvent(new (k.startsWith('pointer') ? PointerEvent : MouseEvent)(k, o)); };
-var __setv = (e, v) => { e.focus(); const p = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(p, 'value').set.call(e, v);
-  e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true})); e.blur(); return e.value === v; };
+var __proto = e => ({TEXTAREA: HTMLTextAreaElement, SELECT: HTMLSelectElement}[e.tagName] || HTMLInputElement).prototype;
+var __val = e => e.isContentEditable ? e.textContent : e.value;
+var __put = (e, v) => { e.focus();
+  if (e.isContentEditable) e.textContent = v; else Object.getOwnPropertyDescriptor(__proto(e), 'value').set.call(e, v);
+  e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true})); };
+var __setv = (e, v) => { __put(e, v); e.blur(); return __val(e) === v; };
 """
 
 
 def fill(match, sel, value):
     js = FIND + f"""(() => {{ const e = __all(document, {q(sel)}).filter(__vis)[0]; if (!e) return 'NOTFOUND';
-  e.focus(); const proto = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, 'value').set.call(e, {q(value)});
-  e.dispatchEvent(new Event('input', {{bubbles: true}})); e.dispatchEvent(new Event('change', {{bubbles: true}}));
-  return e.value.length === {len(value)} ? 'OK' : 'MISMATCH'; }})()"""
+  const v = {q(value)}; __put(e, v);
+  return __val(e).length === v.length ? 'OK' : 'MISMATCH'; }})()"""
     r = run_js(match, js)
     if r != "OK":
         raise RuntimeError(f"fill {sel}: {r}")
