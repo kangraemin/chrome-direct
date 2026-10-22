@@ -55,7 +55,9 @@ def info_values():
 
 
 def main():
-    if not c.ref(a.match):
+    try:
+        c.ref(a.match)  # 탭이 없으면 None이 아니라 RuntimeError를 던진다
+    except RuntimeError:
         sys.exit(f"RESULT: FAILED '{a.match}' 탭 없음 — 사이트에서 휴대폰 인증 창을 먼저 연다")
     t = a.match
     if a.cmd == "extend":
