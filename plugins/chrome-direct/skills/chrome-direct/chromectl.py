@@ -242,12 +242,17 @@ def chrome_pid():
     """진짜 Chrome(사용자 프로필) 메인 프로세스 pid. 다른 세션의 Playwright가 같은 Google Chrome.app을
     --user-data-dir로 띄우면 AppleScript `tell application "Google Chrome"`이 그쪽을 잡는다(2026-10-22).
     그래서 Chrome 명령은 전부 JXA `Application(pid)`로 보낸다. 못 찾으면 None(이름으로 보냄)."""
-    r = subprocess.run(["ps", "-axo", "pid=,args="], capture_output=True, text=True)
+    # 새 탭을 여는 `Google Chrome --profile-directory=…`도 잠깐 메인처럼 보인다 → 가장 오래 돈 것을 고른다
+    r = subprocess.run(["ps", "-axo", "pid=,etime=,args="], capture_output=True, text=True)
+    best = None
     for line in r.stdout.splitlines():
-        pid, _, args = line.strip().partition(" ")
+        pid, et, args = (line.split(None, 2) + ["", ""])[:3]
         if args.startswith(CHROME_BIN) and "--type=" not in args and "--user-data-dir" not in args:
-            return int(pid)
-    return None
+            d, _, hms = et.rpartition("-")
+            secs = int(d or 0) * 86400 + sum(int(x) * 60 ** i for i, x in enumerate(reversed(hms.split(":"))))
+            if best is None or secs > best[0]:
+                best = (secs, int(pid))
+    return best and best[1]
 
 
 def jxa(body, timeout=20):
